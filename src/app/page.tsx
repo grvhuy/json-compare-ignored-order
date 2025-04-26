@@ -1,4 +1,5 @@
-// Tệp pages/index.tsx hoặc app/page.tsx
+"use client"
+
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 
@@ -207,14 +208,14 @@ export default function JSONComparator() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
+    <div className="min-h-screen bg-gray-100 py-6 text-black flex flex-col justify-center sm:py-12">
       <Head>
         <title>Công cụ so sánh JSON</title>
         <meta name="description" content="So sánh hai đối tượng JSON bỏ qua thứ tự" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="relative py-3 sm:max-w-5xl sm:mx-auto">
+      <div className="relative py-3 ">
         <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-10">
           <h1 className="text-2xl font-bold text-center mb-6">Công cụ so sánh JSON (bỏ qua thứ tự)</h1>
 
