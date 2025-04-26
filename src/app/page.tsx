@@ -1,103 +1,305 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+// Tệp pages/index.js
+import { useState, useEffect } from 'react';
+import Head from 'next/head';
+
+export default function JSONComparator() {
+  const [json1, setJson1] = useState('{\n  "name": "John",\n  "age": 30,\n  "city": "New York"\n}');
+  const [json2, setJson2] = useState('{\n  "age": 30,\n  "city": "New York",\n  "name": "John"\n}');
+  const [result, setResult] = useState({ equal: false, message: '', details: '' });
+  const [error, setError] = useState({ json1: false, json2: false });
+
+  const validateJSON = (jsonString) => {
+    try {
+      JSON.parse(jsonString);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const compareJSON = () => {
+    // Kiểm tra tính hợp lệ của JSON
+    const isJson1Valid = validateJSON(json1);
+    const isJson2Valid = validateJSON(json2);
+    
+    setError({
+      json1: !isJson1Valid,
+      json2: !isJson2Valid
+    });
+
+    if (!isJson1Valid || !isJson2Valid) {
+      setResult({
+        equal: false,
+        message: 'JSON không hợp lệ',
+        details: (!isJson1Valid ? 'JSON bên trái không hợp lệ. ' : '') + 
+                 (!isJson2Valid ? 'JSON bên phải không hợp lệ.' : '')
+      });
+      return;
+    }
+
+    // Parse JSON
+    const obj1 = JSON.parse(json1);
+    const obj2 = JSON.parse(json2);
+    
+    // So sánh JSON bỏ qua thứ tự
+    const areEqual = deepCompare(obj1, obj2);
+    
+    if (areEqual) {
+      setResult({
+        equal: true,
+        message: 'Hai JSON giống nhau về mặt nội dung (bỏ qua thứ tự)',
+        details: 'Tất cả các giá trị và cấu trúc đều khớp.'
+      });
+    } else {
+      // Tìm sự khác biệt
+      const differences = findDifferences(obj1, obj2);
+      setResult({
+        equal: false,
+        message: 'Hai JSON khác nhau',
+        details: differences
+      });
+    }
+  };
+
+  // Hàm so sánh sâu hai object
+  const deepCompare = (obj1, obj2) => {
+    // Kiểm tra kiểu dữ liệu
+    if (typeof obj1 !== typeof obj2) {
+      return false;
+    }
+    
+    // Nếu không phải object hoặc là null, so sánh trực tiếp
+    if (typeof obj1 !== 'object' || obj1 === null || obj2 === null) {
+      return obj1 === obj2;
+    }
+    
+    // Kiểm tra mảng
+    if (Array.isArray(obj1) && Array.isArray(obj2)) {
+      if (obj1.length !== obj2.length) {
+        return false;
+      }
+      
+      // Sắp xếp mảng nếu toàn bộ là primitive values
+      if (obj1.every(item => typeof item !== 'object' || item === null) &&
+          obj2.every(item => typeof item !== 'object' || item === null)) {
+        const sorted1 = [...obj1].sort();
+        const sorted2 = [...obj2].sort();
+        
+        return sorted1.every((val, idx) => val === sorted2[idx]);
+      }
+      
+      // Nếu mảng chứa objects, cần kiểm tra từng cặp phần tử
+      // Lưu ý: Cách này đơn giản hóa và không tối ưu cho mọi trường hợp
+      // của mảng chứa objects
+      for (let i = 0; i < obj1.length; i++) {
+        let found = false;
+        for (let j = 0; j < obj2.length; j++) {
+          if (deepCompare(obj1[i], obj2[j])) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) return false;
+      }
+      return true;
+    }
+    
+    // Nếu một trong hai là mảng và một là object
+    if (Array.isArray(obj1) || Array.isArray(obj2)) {
+      return false;
+    }
+    
+    // So sánh đối tượng
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+    
+    if (keys1.length !== keys2.length) {
+      return false;
+    }
+    
+    return keys1.every(key => 
+      keys2.includes(key) && deepCompare(obj1[key], obj2[key])
+    );
+  };
+
+  // Hàm tìm sự khác biệt
+  const findDifferences = (obj1, obj2, path = '') => {
+    let differences = '';
+    
+    // Nếu kiểu dữ liệu khác nhau
+    if (typeof obj1 !== typeof obj2) {
+      return `Kiểu dữ liệu khác nhau tại ${path || 'root'}: ${typeof obj1} vs ${typeof obj2}\n`;
+    }
+    
+    // Nếu không phải object hoặc là null
+    if (typeof obj1 !== 'object' || obj1 === null || obj2 === null) {
+      if (obj1 !== obj2) {
+        return `Giá trị khác nhau tại ${path || 'root'}: ${obj1} vs ${obj2}\n`;
+      }
+      return '';
+    }
+    
+    // Kiểm tra mảng
+    if (Array.isArray(obj1) && Array.isArray(obj2)) {
+      if (obj1.length !== obj2.length) {
+        differences += `Độ dài mảng khác nhau tại ${path || 'root'}: ${obj1.length} vs ${obj2.length}\n`;
+      }
+      
+      // So sánh phần tử mảng (đơn giản hóa)
+      const maxLength = Math.max(obj1.length, obj2.length);
+      for (let i = 0; i < maxLength; i++) {
+        if (i >= obj1.length) {
+          differences += `Mảng 1 thiếu phần tử tại vị trí ${i}\n`;
+        } else if (i >= obj2.length) {
+          differences += `Mảng 2 thiếu phần tử tại vị trí ${i}\n`;
+        } else {
+          const currPath = path ? `${path}[${i}]` : `[${i}]`;
+          differences += findDifferences(obj1[i], obj2[i], currPath);
+        }
+      }
+      return differences;
+    }
+    
+    // Nếu một trong hai là mảng và một là object
+    if (Array.isArray(obj1) || Array.isArray(obj2)) {
+      return `Cấu trúc dữ liệu khác nhau tại ${path || 'root'}: ${Array.isArray(obj1) ? 'Array' : 'Object'} vs ${Array.isArray(obj2) ? 'Array' : 'Object'}\n`;
+    }
+    
+    // So sánh đối tượng
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+    
+    // Kiểm tra các key chỉ có trong obj1
+    for (const key of keys1) {
+      const currPath = path ? `${path}.${key}` : key;
+      if (!keys2.includes(key)) {
+        differences += `Khóa "${key}" chỉ có trong JSON 1 tại ${path || 'root'}\n`;
+      } else {
+        differences += findDifferences(obj1[key], obj2[key], currPath);
+      }
+    }
+    
+    // Kiểm tra các key chỉ có trong obj2
+    for (const key of keys2) {
+      if (!keys1.includes(key)) {
+        differences += `Khóa "${key}" chỉ có trong JSON 2 tại ${path || 'root'}\n`;
+      }
+    }
+    
+    return differences;
+  };
+
+  // Sử dụng useEffect để tự động so sánh khi component được render
+  useEffect(() => {
+    compareJSON();
+  }, []);
+
+  // Hàm format JSON
+  const formatJSON = (textArea) => {
+    try {
+      const jsonString = textArea === 1 ? json1 : json2;
+      const formattedJSON = JSON.stringify(JSON.parse(jsonString), null, 2);
+      
+      if (textArea === 1) {
+        setJson1(formattedJSON);
+      } else {
+        setJson2(formattedJSON);
+      }
+      
+      setError(prev => ({
+        ...prev,
+        [textArea === 1 ? 'json1' : 'json2']: false
+      }));
+    } catch (e) {
+      setError(prev => ({
+        ...prev,
+        [textArea === 1 ? 'json1' : 'json2']: true
+      }));
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-gray-100 py-6 text-black flex flex-col justify-center sm:py-12">
+      <Head>
+        <title>Công cụ so sánh JSON</title>
+        <meta name="description" content="So sánh hai đối tượng JSON bỏ qua thứ tự" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="relative py-3 ">
+        <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-10">
+          <h1 className="text-2xl font-bold text-center mb-6">Công cụ so sánh JSON (bỏ qua thứ tự)</h1>
+          
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* JSON 1 */}
+            <div className="flex-1">
+              <div className="flex justify-between mb-2">
+                <h2 className="text-lg font-semibold">JSON 1</h2>
+                <button 
+                  onClick={() => formatJSON(1)} 
+                  className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+                >
+                  Format
+                </button>
+              </div>
+              <textarea
+                className={`w-full h-64 p-2 border rounded font-mono text-sm ${error.json1 ? 'border-red-500' : 'border-gray-300'}`}
+                value={json1}
+                onChange={(e) => setJson1(e.target.value)}
+                placeholder="Nhập JSON thứ nhất tại đây..."
+              />
+              {error.json1 && <p className="text-red-500 text-xs mt-1">JSON không hợp lệ</p>}
+            </div>
+            
+            {/* JSON 2 */}
+            <div className="flex-1">
+              <div className="flex justify-between mb-2">
+                <h2 className="text-lg font-semibold">JSON 2</h2>
+                <button 
+                  onClick={() => formatJSON(2)} 
+                  className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+                >
+                  Format
+                </button>
+              </div>
+              <textarea
+                className={`w-full h-64 p-2 border rounded font-mono text-sm ${error.json2 ? 'border-red-500' : 'border-gray-300'}`}
+                value={json2}
+                onChange={(e) => setJson2(e.target.value)}
+                placeholder="Nhập JSON thứ hai tại đây..."
+              />
+              {error.json2 && <p className="text-red-500 text-xs mt-1">JSON không hợp lệ</p>}
+            </div>
+          </div>
+          
+          <div className="mt-6 flex justify-center">
+            <button 
+              onClick={compareJSON}
+              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              So sánh
+            </button>
+          </div>
+          
+          {/* Kết quả */}
+          <div className="mt-8 border-t pt-6">
+            <h2 className="text-lg font-semibold mb-3">Kết quả so sánh</h2>
+            <div 
+              className={`p-4 rounded ${result.equal ? 'bg-green-100 border border-green-200' : 'bg-red-100 border border-red-200'}`}
+            >
+              <p className={`font-bold ${result.equal ? 'text-green-700' : 'text-red-700'}`}>{result.message}</p>
+              {result.details && (
+                <div className="mt-3">
+                  <p className="font-medium mb-1">Chi tiết:</p>
+                  <pre className="whitespace-pre-wrap text-sm bg-white p-3 rounded border">{result.details}</pre>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
   );
 }
